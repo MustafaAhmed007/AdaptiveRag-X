@@ -35,7 +35,7 @@ Graph ──┘                    Evidence Grade
 - dense-like local retrieval baseline
 - real BM25 lexical retrieval implementation
 - weighted hybrid retrieval fusion
-- pluggable reranker boundary
+- pluggable reranking boundary
 - multi-hop query decomposition
 - bounded adaptive query-rewrite recovery
 - evidence quality evaluation
@@ -99,11 +99,11 @@ adaptive_rag/
 ├── providers.py        # generator provider boundary
 ├── services.py         # ingestion/chunking
 └── retrieval/
-    ├── base.py         # retrieval contract + local baseline
+    ├── base.py         # retrieval contract
     ├── memory.py       # deterministic local retriever
     ├── sparse.py       # BM25
     ├── hybrid.py       # fusion
-    └── rerank.py       # reranking boundary
+    └── rerank.py       # reranking
 benchmarks/             # reproducible benchmark runner
 docs/                   # architecture + ADRs + interview guide
 tests/                  # automated tests
@@ -120,7 +120,7 @@ tests/                  # automated tests
 
 ## Production hardening path
 
-The core is complete and runnable locally. Production adapters can be added behind the existing boundaries for Qdrant/vector storage, hosted embeddings, cross-encoder reranking, web search, graph retrieval, OpenTelemetry/Prometheus, authentication and durable persistence. Those integrations are intentionally not represented as complete until they are implemented and tested.
+The core is runnable locally. Production adapters belong behind the existing boundaries for Qdrant/vector storage, hosted embeddings, cross-encoder reranking, web search, graph retrieval, OpenTelemetry/Prometheus, authentication and durable persistence. They should be marked complete only after implementation and tests exist.
 
 ## Evaluation
 
