@@ -1,8 +1,20 @@
 from ..models import Evidence
+from .base import tokenize
+
+
 class ScoreReranker:
-    def rerank(self,query,evidence,top_k=5):
-        q=set(query.lower().split())
-        def score(e): return .65*e.score+.35*(len(q&set(e.text.lower().split()))/max(1,len(q)))
-        ranked=sorted(evidence,key=score,reverse=True)[:top_k]
-        return [e.model_copy(update={'score':min(1,score(e)),'rank':i+1}) for i,e in enumerate(ranked)]
-SimpleReranker=ScoreReranker
+    def rerank(self, query: str, evidence: list[Evidence], top_k: int = 5) -> list[Evidence]:
+        query_terms = set(tokenize(query))
+
+        def score(item: Evidence) -> float:
+            overlap = len(query_terms & set(tokenize(item.text))) / max(len(query_terms), 1)
+            return min(1.0, 0.65 * item.score + 0.35 * overlap)
+
+        ranked = sorted(evidence, key=score, reverse=True)[:top_k]
+        return [
+            item.model_copy(update={"score": score(item), "rank": index})
+            for index, item in enumerate(ranked, start=1)
+        ]
+
+
+SimpleReranker = ScoreReranker
