@@ -12,7 +12,7 @@ class QdrantRetriever(Retriever):
         self.embedder = embedder
 
     def add(self, documents: list[Document]) -> None:
-        from qdrant_client.models import PointStruct, VectorParams
+        from qdrant_client.models import Distance, PointStruct, VectorParams
 
         try:
             self.client.get_collection(self.collection)
@@ -20,13 +20,18 @@ class QdrantRetriever(Retriever):
             vector = self.embedder.embed("dimension probe")
             self.client.create_collection(
                 collection_name=self.collection,
-                vectors_config=VectorParams(size=len(vector), distance="Cosine"),
+                vectors_config=VectorParams(size=len(vector), distance=Distance.COSINE),
             )
         points = [
             PointStruct(
                 id=doc.id,
                 vector=self.embedder.embed(doc.text),
-                payload={"text": doc.text, "source": doc.source, "metadata": doc.metadata},
+                payload={
+                    "text": doc.text,
+                    "source": doc.source,
+                    "metadata": doc.metadata,
+                    "tenant_id": doc.tenant_id,
+                },
             )
             for doc in documents
         ]
