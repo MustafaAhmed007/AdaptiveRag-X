@@ -48,4 +48,6 @@ def load_file(path: str, tenant_id: str = "default") -> list[Document]:
     if suffix not in {".txt", ".md", ".markdown"}:
         raise ValueError("supported file types are .txt, .md and .markdown")
     text = file_path.read_text(encoding="utf-8")
-    return ingest_markdown(text, str(file_path), tenant_id) if suffix in {".md", ".markdown"} else ingest_text(text, str(file_path), tenant_id=tenant_id)
+    if suffix in {".md", ".markdown"}:
+        return ingest_markdown(text, str(file_path), tenant_id)
+    return ingest_text(text, str(file_path), tenant_id=tenant_id)
