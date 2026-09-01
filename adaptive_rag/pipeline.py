@@ -1,50 +1,30 @@
-from uuid import uuid4
-from .evaluation import evaluate_evidence
-from .models import Citation, QueryResponse
-from .observability import Trace
+from .models import QueryResponse
 from .planner import build_plan
+from .evaluation import evaluate_evidence,answer_grounded
+from .observability import Trace
 from .security import SecurityGate
-
-class MockGenerator:
-    """Provider-neutral generator for local tests; replace via dependency injection."""
-    def generate(self, query: str, evidence) -> str:
-        if not evidence:
-            return "I do not have enough evidence in the indexed knowledge to answer that reliably."
-        snippets = " ".join(e.text for e in evidence[:3])
-        return f"Based on the retrieved evidence: {snippets}"
-
+from .retrieval.memory import InMemoryRetriever
+from .retrieval.sparse import BM25Retriever
+from .retrieval.hybrid import HybridRetriever
+from .retrieval.rerank import ScoreReranker
+from .providers import MockGenerator
+from .query import rewrite_query,decompose_query,build_citations
 class AdaptivePipeline:
-    def __init__(self, retriever, reranker=None, generator=None, security=None):
-        self.retriever = retriever
-        self.reranker = reranker
-        self.generator = generator or MockGenerator()
-        self.security = security or SecurityGate()
-
-    def run(self, query: str, top_k: int = 5) -> QueryResponse:
-        allowed, reason = self.security.inspect(query)
-        if not allowed:
-            raise ValueError(f"request blocked: {reason}")
-        plan = build_plan(query, top_k)
-        trace = Trace(strategy=plan.name)
-        trace.event("query_profile", profile=plan.profile.model_dump())
-        evidence = []
-        attempts = 0
-        for attempts in range(1, plan.max_attempts + 1):
-            evidence = self.retriever.retrieve(query, plan.top_k)
-            trace.event("retrieval", attempt=attempts, count=len(evidence))
-            if plan.rerank and self.reranker:
-                evidence = self.reranker.rerank(query, evidence, plan.top_k)
-                trace.event("rerank", count=len(evidence))
-            evaluation = evaluate_evidence(evidence)
-            trace.event("evidence_eval", quality=evaluation.evidence_quality, grounded=evaluation.grounded)
-            if evaluation.grounded or attempts == plan.max_attempts:
-                break
-            query = f"{query} with precise terminology and supporting evidence"
-            trace.event("query_rewrite", attempt=attempts + 1)
-        answer = self.generator.generate(query, evidence)
-        citations = [Citation(document_id=e.document_id, source=e.source, span=e.text[:180]) for e in evidence]
-        confidence = evaluate_evidence(evidence).evidence_quality
-        trace.attempts = attempts
-        return QueryResponse(answer=answer, strategy=plan.name, confidence=confidence,
-                             citations=citations, trace_id=trace.trace_id, attempts=attempts,
-                             estimated_cost_usd=trace.estimated_cost_usd)
+    def __init__(self,retriever=None,reranker=None,generator=None,security=None):
+        self.retriever=retriever or HybridRetriever(InMemoryRetriever(),BM25Retriever()); self.reranker=reranker or ScoreReranker(); self.generator=generator or MockGenerator(); self.security=security or SecurityGate()
+    def add_documents(self,documents): self.retriever.add(documents)
+    def run(self,query:str,top_k:int=5)->QueryResponse:
+        allowed,reason=self.security.inspect(query)
+        if not allowed: raise ValueError('request blocked: '+reason)
+        original=query; plan=build_plan(query,top_k); trace=Trace(plan.name); evidence=[]
+        for attempt in range(1,plan.max_attempts+1):
+            subs=decompose_query(query) if plan.profile.multi_hop else [query]; pool=[]
+            for sq in subs: pool.extend(self.retriever.retrieve(sq,plan.top_k))
+            evidence=list({e.document_id:e for e in pool}.values())
+            if plan.rerank: evidence=self.reranker.rerank(original,evidence,plan.top_k)
+            ev=evaluate_evidence(evidence); trace.event('attempt',attempt=attempt,evidence=len(evidence),quality=ev.overall)
+            if ev.grounded or attempt==plan.max_attempts: break
+            query=rewrite_query(original,attempt); trace.event('rewrite',query=query)
+        answer=self.generator.generate(original,evidence); grounded=answer_grounded(answer,evidence); trace.attempts=attempt; trace.finish()
+        ev=evaluate_evidence(evidence)
+        return QueryResponse(answer=answer,strategy=plan.name,confidence=min(1,.5*ev.overall+.5*grounded),citations=build_citations(evidence),trace_id=trace.trace_id,attempts=attempt,estimated_cost_usd=trace.estimated_cost_usd)
