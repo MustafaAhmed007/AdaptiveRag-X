@@ -1,3 +1,4 @@
+from .config import settings
 from .models import Evidence
 
 
@@ -11,7 +12,7 @@ class MockGenerator:
 
 
 class ProviderGenerator:
-    """OpenAI-compatible Responses API generator behind an injectable client."""
+    """OpenAI Responses API generator behind an injected client."""
 
     def __init__(self, client, model: str = "gpt-4.1-mini"):
         self.client = client
@@ -28,3 +29,13 @@ class ProviderGenerator:
             ),
         )
         return response.output_text
+
+
+def build_generator():
+    if settings.llm_provider.lower() == "openai":
+        if not settings.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
+        from openai import OpenAI
+
+        return ProviderGenerator(OpenAI(api_key=settings.openai_api_key), settings.llm_model)
+    return MockGenerator()
