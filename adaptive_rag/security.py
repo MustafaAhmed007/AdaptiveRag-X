@@ -1,15 +1,7 @@
 import re
-
-INJECTION_PATTERNS = (
-    r"ignore (all|any|previous|prior) instructions",
-    r"reveal (the )?(system|developer) prompt",
-    r"disable (your|the) safety",
-)
-
 class SecurityGate:
-    def inspect(self, text: str) -> tuple[bool, str]:
-        normalized = " ".join(text.lower().split())
-        for pattern in INJECTION_PATTERNS:
-            if re.search(pattern, normalized):
-                return False, "potential_prompt_injection"
-        return True, "ok"
+    PATTERNS=(r'ignore (all|previous|prior) instructions',r'reveal (the )?(system|developer) prompt',r'print (your|the) hidden prompt',r'jailbreak')
+    def inspect(self,query:str):
+        for pattern in self.PATTERNS:
+            if re.search(pattern,query.lower()): return False,'prompt-injection pattern detected'
+        return True,'ok'
