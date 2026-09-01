@@ -15,12 +15,7 @@ pip install -e '.[dev]'
 uvicorn adaptive_rag.api:app --reload
 ```
 
-Quality gates:
-
-```bash
-ruff check adaptive_rag tests
-pytest -q
-```
+Quality gates: `ruff check adaptive_rag tests` and `pytest -q`.
 
 The core is deterministic and runs without API keys. Production integrations belong behind explicit provider boundaries and should only be documented as complete after implementation and tests exist. No benchmark numbers are fabricated.
 
