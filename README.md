@@ -1,77 +1,53 @@
 # AdaptiveRAG-X
 
-> **Self-evaluating, cost-aware, hybrid and agentic Retrieval-Augmented Generation platform.**
+**Production-oriented adaptive Retrieval-Augmented Generation (RAG) reference system.**
+
+AdaptiveRAG-X demonstrates how a RAG system can choose retrieval depth and strategy from query characteristics, recover from weak evidence, and expose measurable quality signals instead of treating every question identically.
 
 [![CI](https://github.com/MustafaAhmed007/AdaptiveRag-X/actions/workflows/ci.yml/badge.svg)](https://github.com/MustafaAhmed007/AdaptiveRag-X/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/API-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/license-MIT-black.svg)](LICENSE)
 
-AdaptiveRAG-X is a production-oriented RAG reference implementation designed around one principle: **retrieval should adapt to the question instead of forcing every question through the same pipeline.**
-
-It combines query intelligence, strategy selection, dense/sparse/hybrid retrieval abstractions, reranking, evidence grading, iterative recovery, answer verification, citations, cost/latency telemetry, security gates, and reproducible evaluation.
-
-## Architecture
+## System
 
 ```text
-                         ┌─────────────────────┐
-                         │       Query         │
-                         └──────────┬──────────┘
-                                    │
-                         ┌──────────▼──────────┐
-                         │   Query Intelligence │
-                         │ intent/complexity/  │
-                         │ freshness/risk      │
-                         └──────────┬──────────┘
-                                    │
-                         ┌──────────▼──────────┐
-                         │  Adaptive Planner   │
-                         └──────────┬──────────┘
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              │                     │                     │
-        Dense retrieval       Sparse retrieval       Web / Graph
-              │                     │                     │
-              └─────────────────────┼─────────────────────┘
-                                    │
-                         ┌──────────▼──────────┐
-                         │ Hybrid + Reranking  │
-                         └──────────┬──────────┘
-                                    │
-                         ┌──────────▼──────────┐
-                         │ Evidence Grader     │
-                         └──────────┬──────────┘
-                                    │
-                         insufficient evidence?
-                              │             │
-                             yes            no
-                              │             │
-                    rewrite/decompose      ▼
-                              │      ┌───────────────┐
-                              └─────►│ Grounded LLM  │
-                                     └───────┬───────┘
-                                             │
-                                     ┌───────▼───────┐
-                                     │ Verify + Cite │
-                                     └───────┬───────┘
-                                             │
-                                     ┌───────▼───────┐
-                                     │ Eval + Trace  │
-                                     └───────────────┘
+Query
+  ↓
+Profile: intent / complexity / freshness / multi-hop / risk
+  ↓
+Adaptive Plan
+  ↓
+Dense ──┐
+BM25 ───┼→ Hybrid Fusion → Rerank
+Web ────┤                         ↓
+Graph ──┘                    Evidence Grade
+                                  ↓
+                       weak → rewrite/decompose → retry
+                                  ↓
+                           grounded generation
+                                  ↓
+                       verification + citations
+                                  ↓
+                            evaluation + trace
 ```
 
-## What makes it different
+## Implemented end-to-end
 
-- **Adaptive routing:** strategy is selected from query characteristics.
-- **Hybrid retrieval:** dense and lexical retrieval can be fused.
-- **Reranking boundary:** retrieval and precision ranking are separate concerns.
-- **Evidence-first generation:** answers are built from explicit evidence objects.
-- **Recovery loop:** weak evidence triggers rewrite/decomposition rather than blind generation.
-- **Verification:** generated answers can be checked for grounding and citation coverage.
-- **Cost awareness:** every run records model/tool usage and estimated cost.
-- **Observability:** a trace captures decisions, latency and retrieval behavior.
-- **Security:** prompt-injection and unsafe-tool checks are first-class pipeline stages.
-- **Evaluation:** benchmark adapters and deterministic unit tests live beside the system.
+- typed query intelligence and explainable routing
+- dense-like local retrieval baseline
+- real BM25 lexical retrieval implementation
+- weighted hybrid retrieval fusion
+- pluggable reranker boundary
+- multi-hop query decomposition
+- bounded adaptive query-rewrite recovery
+- evidence quality evaluation
+- answer groundedness measurement
+- citation objects
+- prompt-injection gate
+- structured execution traces
+- FastAPI indexing/query/health API
+- deterministic local runtime with no API key required
+- hosted-LLM provider boundary
+- Docker and GitHub Actions CI
+- tests and interview-oriented architecture documentation
 
 ## Quick start
 
@@ -79,90 +55,85 @@ It combines query intelligence, strategy selection, dense/sparse/hybrid retrieva
 python -m venv .venv
 # Windows: .venv\\Scripts\\activate
 source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env
+pip install -e '.[dev]'
 uvicorn adaptive_rag.api:app --reload
 ```
 
 Open `http://localhost:8000/docs`.
 
-### Example request
+Index data:
+
+```bash
+curl -X POST http://localhost:8000/v1/documents \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Adaptive retrieval selects retrieval strategies according to query characteristics.","source":"demo"}'
+```
+
+Query:
 
 ```bash
 curl -X POST http://localhost:8000/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"query":"What is retrieval augmented generation?"}'
+  -H 'Content-Type: application/json' \
+  -d '{"query":"What does adaptive retrieval do?"}'
 ```
 
-The default local runtime uses deterministic in-memory retrieval and a mock generator, so the architecture and tests work **without an API key**. Provider adapters can be added behind the interfaces in `adaptive_rag/providers/`.
-
-## Project map
-
-```text
-adaptive_rag/
-├── api.py                 # FastAPI application
-├── config.py              # typed settings
-├── models.py              # domain contracts
-├── planner.py             # adaptive strategy selection
-├── pipeline.py            # orchestration and recovery loop
-├── security.py            # input/tool safety gates
-├── evaluation.py          # evaluation primitives
-├── observability.py       # traces and usage accounting
-├── retrieval/             # dense/sparse/hybrid/rerank interfaces
-├── providers/             # model/search provider boundaries
-└── services/              # ingestion and application services
-benchmarks/                # golden datasets and benchmark runner
-experiments/               # reproducible experiment definitions
-docs/                     # architecture, ADRs and interview guide
-tests/                    # unit/integration tests
-.github/workflows/         # CI
-```
-
-## Engineering principles
-
-1. **Interfaces before integrations.** Providers are replaceable.
-2. **Evidence before prose.** Retrieval outputs are structured objects.
-3. **Measure before optimizing.** Quality, latency and cost are tracked together.
-4. **Fail explicitly.** Weak evidence is a recoverable state, not a hidden failure.
-5. **Keep the core deterministic.** External model behavior is isolated at the edges.
-
-## Evaluation
-
-Run the local benchmark:
+Quality gates:
 
 ```bash
-python -m benchmarks.run
+ruff check adaptive_rag tests
 pytest -q
 ```
 
-The benchmark compares routing decisions and evidence quality. Provider-backed evaluation can be enabled later without changing the core contracts.
+## Repository map
+
+```text
+adaptive_rag/
+├── api.py              # FastAPI application
+├── models.py           # domain contracts
+├── planner.py          # query intelligence + routing
+├── pipeline.py         # adaptive orchestration
+├── query.py            # rewrite/decomposition/citations
+├── evaluation.py       # retrieval + grounding metrics
+├── observability.py    # trace model
+├── security.py         # input safety gate
+├── providers.py        # generator provider boundary
+├── services.py         # ingestion/chunking
+└── retrieval/
+    ├── base.py         # retrieval contract + local baseline
+    ├── memory.py       # deterministic local retriever
+    ├── sparse.py       # BM25
+    ├── hybrid.py       # fusion
+    └── rerank.py       # reranking boundary
+benchmarks/             # reproducible benchmark runner
+docs/                   # architecture + ADRs + interview guide
+tests/                  # automated tests
+.github/workflows/      # CI
+```
+
+## Design principles
+
+1. **Interfaces before providers.** Infrastructure is replaceable.
+2. **Evidence before prose.** Retrieval returns typed evidence.
+3. **Measure before optimizing.** Quality, latency and cost belong together.
+4. **Fail explicitly.** Weak evidence triggers bounded recovery.
+5. **Deterministic core.** Provider variability is isolated at the edges.
+
+## Production hardening path
+
+The core is complete and runnable locally. Production adapters can be added behind the existing boundaries for Qdrant/vector storage, hosted embeddings, cross-encoder reranking, web search, graph retrieval, OpenTelemetry/Prometheus, authentication and durable persistence. Those integrations are intentionally not represented as complete until they are implemented and tested.
+
+## Evaluation
+
+The benchmark runner and evaluator are designed to prevent invented performance claims. Add a golden dataset, run the experiment, record the output, and promote only changes that improve the measured target without violating latency/cost budgets.
 
 ## Interview laboratory
 
-See [`docs/interview-guide/`](docs/interview-guide/) for concise explanations and questions covering chunking, hybrid search, reranking, routing, agentic RAG, evaluation, observability, security and cost optimization.
+`docs/interview-guide/` connects the implementation to questions around chunking, embeddings, BM25, hybrid search, reranking, routing, agentic recovery, evaluation, observability, security, cost and system design.
 
 ## Responsible provenance
 
-This repository is an independent implementation and extension of general RAG/agentic-RAG engineering patterns. It does not claim ownership of the underlying field concepts. Where third-party code is reused, its license and notices must be preserved.
-
-## Roadmap
-
-- [x] Typed query intelligence and adaptive planner
-- [x] Evidence contracts and recovery loop
-- [x] Dense/sparse/hybrid retrieval interfaces
-- [x] Reranking abstraction
-- [x] Evaluation and telemetry primitives
-- [x] Security gate
-- [x] FastAPI API
-- [x] CI and tests
-- [ ] Production Qdrant adapter
-- [ ] BM25 implementation adapter
-- [ ] Cross-encoder reranker adapter
-- [ ] Graph retrieval adapter
-- [ ] Web-search adapter
-- [ ] OpenTelemetry/Prometheus exporters
-- [ ] Full benchmark suite with provider-backed models
+This repository is an independent implementation of broadly known RAG and agentic-RAG engineering patterns. It does not claim ownership of general field concepts. Any third-party code incorporated in future changes must retain its applicable license and notices.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT
