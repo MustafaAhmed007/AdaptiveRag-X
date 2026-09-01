@@ -2,7 +2,7 @@ from .evaluation import answer_grounded, evaluate_evidence
 from .models import Evidence, QueryResponse
 from .observability import Trace
 from .planner import build_plan
-from .providers import MockGenerator
+from .providers import build_generator
 from .query import build_citations, decompose_query, rewrite_query
 from .retrieval.graph import EntityGraphRetriever
 from .retrieval.hybrid import HybridRetriever
@@ -18,7 +18,7 @@ class AdaptivePipeline:
         self.retriever = retriever or HybridRetriever(InMemoryRetriever(), BM25Retriever())
         self.graph = EntityGraphRetriever()
         self.reranker = reranker or ScoreReranker()
-        self.generator = generator or MockGenerator()
+        self.generator = generator or build_generator()
         self.security = security or SecurityGate()
         self.web = web_retriever or WebRetriever("")
 
