@@ -1,11 +1,12 @@
-from urllib.request import Request, urlopen
 import json
+from urllib.parse import quote_plus
+from urllib.request import Request, urlopen
 
 from ..models import Evidence
 
 
 class WebRetriever:
-    """Configurable JSON search adapter. Set WEB_SEARCH_URL to a compatible endpoint."""
+    """Configurable JSON search adapter; set WEB_SEARCH_URL to a compatible endpoint."""
 
     def __init__(self, endpoint: str, timeout: float = 8.0):
         self.endpoint = endpoint
@@ -15,7 +16,8 @@ class WebRetriever:
         if not self.endpoint:
             return []
         separator = "&" if "?" in self.endpoint else "?"
-        request = Request(f"{self.endpoint}{separator}q={query}&limit={top_k}")
+        url = f"{self.endpoint}{separator}q={quote_plus(query)}&limit={top_k}"
+        request = Request(url)
         with urlopen(request, timeout=self.timeout) as response:
             payload = json.load(response)
         results = payload.get("results", payload if isinstance(payload, list) else [])
