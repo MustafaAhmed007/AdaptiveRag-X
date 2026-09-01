@@ -1,34 +1,13 @@
-from .base import Retriever, Reranker
+from .base import Retriever
 from ..models import Evidence
-
-class SimpleReranker(Reranker):
-    def rerank(self, query: str, evidence: list[Evidence], k: int = 5) -> list[Evidence]:
-        q = set(query.lower().split())
-        def score(e: Evidence) -> float:
-            words = set(e.text.lower().split())
-            lexical = len(q & words) / max(len(q), 1)
-            return 0.6 * e.score + 0.4 * lexical
-        ranked = sorted(evidence, key=score, reverse=True)
-        return [e.model_copy(update={"score": min(score(e), 1.0)}) for e in ranked[:k]]
-
 class HybridRetriever(Retriever):
-    """Combines two retrieval signals through normalized weighted fusion."""
-    def __init__(self, dense: Retriever, sparse: Retriever, alpha: float = 0.65):
-        if not 0 <= alpha <= 1:
-            raise ValueError("alpha must be between 0 and 1")
-        self.dense, self.sparse, self.alpha = dense, sparse, alpha
-
-    def retrieve(self, query: str, k: int = 5) -> list[Evidence]:
-        dense = self.dense.retrieve(query, k * 2)
-        sparse = self.sparse.retrieve(query, k * 2)
-        by_id: dict[str, Evidence] = {}
-        for item in dense:
-            by_id[item.document_id] = item.model_copy(update={"score": self.alpha * item.score})
-        for item in sparse:
-            if item.document_id in by_id:
-                old = by_id[item.document_id]
-                score = old.score + (1 - self.alpha) * item.score
-                by_id[item.document_id] = old.model_copy(update={"score": score})
-            else:
-                by_id[item.document_id] = item.model_copy(update={"score": (1 - self.alpha) * item.score})
-        return sorted(by_id.values(), key=lambda x: x.score, reverse=True)[:k]
+    def __init__(self,dense,sparse,dense_weight=.6,sparse_weight=.4): self.dense=dense; self.sparse=sparse; self.dw=dense_weight; self.sw=sparse_weight
+    def add(self,documents): self.dense.add(documents); self.sparse.add(documents)
+    def retrieve(self,query,top_k=5):
+        merged={}
+        for e in self.dense.retrieve(query,top_k*3): merged[e.document_id]=[e,e.score]
+        for e in self.sparse.retrieve(query,top_k*3):
+            if e.document_id in merged: merged[e.document_id][1]=self.sw*e.score+self.dw*merged[e.document_id][1]
+            else: merged[e.document_id]=[e,self.sw*e.score]
+        ranked=[e.model_copy(update={'score':min(1,s)}) for e,s in merged.values()]; ranked.sort(key=lambda e:e.score,reverse=True)
+        return [e.model_copy(update={'rank':i+1}) for i,e in enumerate(ranked[:top_k])]
