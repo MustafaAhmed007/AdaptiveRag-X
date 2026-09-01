@@ -14,9 +14,14 @@ class Trace:
 
     def event(self, name: str, **data) -> None:
         self.events.append(
-            {"name": name, "data": data, "elapsed_ms": round((perf_counter() - self.started) * 1000, 2)}
+            {
+                "name": name,
+                "data": data,
+                "elapsed_ms": round((perf_counter() - self.started) * 1000, 2),
+            }
         )
 
     def finish(self):
+        self.estimated_cost_usd = round(0.0001 * max(self.attempts, 1), 6)
         self.event("complete", attempts=self.attempts, cost_usd=self.estimated_cost_usd)
         return self
