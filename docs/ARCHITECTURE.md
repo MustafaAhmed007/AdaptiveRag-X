@@ -1,29 +1,60 @@
-# Architecture
+# AdaptiveRAG-X Architecture
 
-## Decision model
+## Core idea
 
-AdaptiveRAG-X treats retrieval as a policy decision. The planner estimates intent, complexity and freshness requirements before selecting a strategy.
+AdaptiveRAG-X treats retrieval as a policy decision rather than a fixed chain. The planner profiles each query, selects an appropriate retrieval budget, and uses evaluation to decide whether a bounded recovery attempt is justified.
 
-| Query profile | Default strategy | Why |
+## Runtime flow
+
+```text
+request → security → profile → plan → retrieve → fuse → rerank
+                                      ↓                 ↓
+                                graph / web        evaluate evidence
+                                      ↓                 ↓
+                                  rewrite ← weak ← quality gate
+                                      ↓
+                              grounded generation
+                                      ↓
+                           citations / confidence / trace
+```
+
+## Routing policy
+
+| Profile | Strategy | Primary reason |
 |---|---|---|
-| short factual | dense_fast | minimize latency and cost |
-| explanatory | hybrid | improve lexical + semantic coverage |
-| comparison / multi-hop | adaptive_hybrid_rerank | broader candidate set and precision ranking |
-| freshness-sensitive | web_hybrid | external/current evidence is required |
+| Short factual | dense/local | low latency and cost |
+| Explanatory | hybrid | semantic + lexical coverage |
+| Comparison | hybrid + rerank | candidate breadth + precision |
+| Multi-hop | hybrid + graph | relationship traversal |
+| Freshness-sensitive | web + hybrid | current external evidence |
 
-## Recovery loop
+## Retrieval stack
 
-Evidence quality is evaluated before generation. If evidence is weak, the system rewrites the retrieval query and retries within a bounded attempt budget. This prevents unbounded agent loops.
+- **Dense boundary:** `Embedder` supports deterministic local vectors and OpenAI embeddings.
+- **Sparse:** BM25 captures exact terminology, identifiers and lexical matches.
+- **Hybrid:** weighted fusion combines dense-like and sparse candidates.
+- **Graph:** an entity-overlap graph provides a dependency-free multi-hop baseline.
+- **Vector DB:** `QdrantRetriever` is an optional production adapter.
+- **Web:** `WebRetriever` accepts a compatible JSON search endpoint.
+- **Reranking:** deterministic scorer is always available; a CrossEncoder adapter is optional.
 
-## Provider boundaries
+## Generation stack
 
-The core pipeline depends on `Retriever`, `Reranker`, and generator contracts rather than vendor SDKs. This allows Qdrant, Elasticsearch/BM25, cross-encoders, hosted LLMs or local models to be introduced without rewriting orchestration.
+The pipeline uses a provider boundary. `MockGenerator` makes the repository executable without credentials. `ProviderGenerator` uses an injected OpenAI-compatible client and a grounded system instruction. The model is configured through environment variables rather than source code.
 
-## Production extension points
+## Persistence and tenancy
 
-1. Replace `InMemoryRetriever` with a vector database adapter.
-2. Add a real sparse retriever and reciprocal-rank fusion.
-3. Add a cross-encoder reranker.
-4. Add web and graph tools behind permissioned interfaces.
-5. Export traces to OpenTelemetry and metrics to Prometheus.
-6. Persist evaluation traces for regression analysis.
+`SQLiteDocumentStore` provides a durable local document store with tenant IDs and versions. The domain model carries tenant metadata into ingestion and vector payloads. A production deployment should add database-level isolation and authorization policies appropriate to its threat model.
+
+## Safety and reliability
+
+1. Prompt-injection patterns are rejected before retrieval.
+2. API-key authentication is optional for local development and can be required in production.
+3. Per-client rate limiting prevents accidental runaway traffic.
+4. Retrieval retries are bounded by query complexity.
+5. Evaluation exposes retrieval relevance, context precision/recall, groundedness and citation coverage.
+6. Trace IDs, attempt counts and estimated costs make each response diagnosable.
+
+## Operational model
+
+The local configuration has no mandatory external services. Production deployments can progressively add a real embedding provider, Qdrant, web search, a cross-encoder and an LLM. This keeps development deterministic while preserving clean integration boundaries.
