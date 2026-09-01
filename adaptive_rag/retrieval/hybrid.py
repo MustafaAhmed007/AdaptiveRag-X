@@ -1,4 +1,5 @@
 from .base import Retriever
+from .rerank import ScoreReranker
 
 
 class HybridRetriever(Retriever):
@@ -28,6 +29,5 @@ class HybridRetriever(Retriever):
         return [item.model_copy(update={"rank": index}) for index, item in enumerate(ranked[:top_k], 1)]
 
 
-from .rerank import ScoreReranker as SimpleReranker
-
+SimpleReranker = ScoreReranker
 __all__ = ["HybridRetriever", "SimpleReranker"]
