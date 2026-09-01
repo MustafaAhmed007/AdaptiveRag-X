@@ -1,9 +1,7 @@
 name: CI
-
 on:
   push:
   pull_request:
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,11 +10,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install
-        run: pip install -e ".[dev]"
-      - name: Lint
-        run: ruff check .
-      - name: Tests
-        run: pytest
-      - name: Benchmark smoke test
-        run: python -m benchmarks.run
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check adaptive_rag tests benchmarks
+      - run: pytest -q
+      - run: python -m benchmarks.run
