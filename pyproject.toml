@@ -21,7 +21,7 @@ all = ["openai>=1.40", "qdrant-client>=1.10", "sentence-transformers>=3.0"]
 
 [project.scripts]
 adaptive-rag = "adaptive_rag.cli:main"
-adaptive-rag-api = "adaptive_rag.api:app"
+adaptive-rag-api = "adaptive_rag.api_cli:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
