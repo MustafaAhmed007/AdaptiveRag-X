@@ -16,6 +16,8 @@ class Settings:
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///adaptive_rag.db")
     web_search_url: str = os.getenv("WEB_SEARCH_URL", "")
     max_requests_per_minute: int = int(os.getenv("MAX_REQUESTS_PER_MINUTE", "60"))
+    host: str = os.getenv("HOST", "127.0.0.1")
+    port: int = int(os.getenv("PORT", "8000"))
 
 
 settings = Settings()
