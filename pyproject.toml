@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "adaptive-rag-x"
-version = "1.1.0"
+version = "1.2.0"
 description = "Production-oriented adaptive RAG platform with hybrid, graph, web, evaluation and safety layers"
 requires-python = ">=3.11"
 dependencies = [
@@ -17,9 +17,11 @@ dependencies = [
 dev = ["pytest>=8", "ruff>=0.6", "httpx>=0.27"]
 providers = ["openai>=1.40", "qdrant-client>=1.10"]
 reranking = ["sentence-transformers>=3.0"]
+all = ["openai>=1.40", "qdrant-client>=1.10", "sentence-transformers>=3.0"]
 
 [project.scripts]
-adaptive-rag = "adaptive_rag.api:app"
+adaptive-rag = "adaptive_rag.cli:main"
+adaptive-rag-api = "adaptive_rag.api:app"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
