@@ -11,8 +11,8 @@ def profile_query(query: str) -> QueryProfile:
     exploratory = bool(re.search(r"\b(explain|why|how does|overview|explore|deep dive)\b", text))
     intent = (
         Intent.CURRENT if freshness else
-        Intent.MULTI_HOP if multi_hop else
         Intent.COMPARISON if comparison else
+        Intent.MULTI_HOP if multi_hop else
         Intent.EXPLORATORY if exploratory else Intent.FACTUAL
     )
     complexity = Complexity.HIGH if multi_hop or len(text.split()) > 24 else Complexity.MEDIUM if len(text.split()) > 10 else Complexity.LOW

@@ -1,6 +1,6 @@
+import re
 from abc import ABC, abstractmethod
 from collections import Counter
-import re
 
 from ..models import Document, Evidence
 

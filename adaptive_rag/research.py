@@ -72,7 +72,7 @@ class MultiAspectResearch:
         request = Request(url, headers={"User-Agent": "AdaptiveRAG-X/1.2"})
         with urlopen(request, timeout=self.timeout) as response:
             raw = response.read().decode("utf-8", errors="ignore")
-        text = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>", " ", raw, flags=re.I)
+        text = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>", " ", raw, flags=re.IGNORECASE)
         text = re.sub(r"<[^>]+>", " ", text)
         text = re.sub(r"\s+", " ", text).strip()
         return ResearchSource(source=url, text=text[:120_000], kind="direct_url")
