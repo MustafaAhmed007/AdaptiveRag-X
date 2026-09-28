@@ -9,9 +9,28 @@ class InMemoryRetriever(Retriever):
     def add(self, documents: list[Document]) -> None:
         self.docs.extend(documents)
 
-    def retrieve(self, query: str, top_k: int = 5) -> list[Evidence]:
-        scored = [(lexical_score(query, doc.text), doc) for doc in self.docs]
-        scored.sort(key=lambda item: item[0], reverse=True)
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 5,
+        tenant_id: str = "default",
+    ) -> list[Evidence]:
+        tenant_docs = [
+            doc
+            for doc in self.docs
+            if doc.tenant_id == tenant_id
+        ]
+
+        scored = [
+            (lexical_score(query, doc.text), doc)
+            for doc in tenant_docs
+        ]
+
+        scored.sort(
+            key=lambda item: item[0],
+            reverse=True,
+        )
+
         return [
             Evidence(
                 document_id=doc.id,
@@ -21,7 +40,10 @@ class InMemoryRetriever(Retriever):
                 rank=index,
                 metadata=doc.metadata,
             )
-            for index, (score, doc) in enumerate(scored[:top_k], start=1)
+            for index, (score, doc) in enumerate(
+                scored[:top_k],
+                start=1,
+            )
             if score > 0
         ]
 

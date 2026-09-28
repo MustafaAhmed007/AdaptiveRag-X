@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 
@@ -27,8 +27,12 @@ api_key_header = APIKeyHeader(name="x-api-key", auto_error=False)
 
 
 @app.middleware("http")
-async def security_middleware(request, call_next):
-    await auth_and_rate_limit(request)
+async def security_middleware(request: Request, call_next):
+    security_response = await auth_and_rate_limit(request)
+
+    if security_response is not None:
+        return security_response
+
     return await call_next(request)
 
 
@@ -56,7 +60,7 @@ def add_document(payload: dict, _api_key: str | None = Depends(api_key_header)) 
 @app.post("/v1/query", response_model=QueryResponse)
 def query(req: QueryRequest, _api_key: str | None = Depends(api_key_header)) -> QueryResponse:
     try:
-        return pipeline.run(req.query, req.top_k)
+        return pipeline.run(req.query, req.top_k, req.tenant_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

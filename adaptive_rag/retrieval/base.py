@@ -24,5 +24,10 @@ class Retriever(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def retrieve(self, query: str, top_k: int = 5) -> list[Evidence]:
+    def retrieve(
+    self,
+    query: str,
+    top_k: int = 5,
+    tenant_id: str = "default",
+) -> list[Evidence]:
         raise NotImplementedError

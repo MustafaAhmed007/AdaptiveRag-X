@@ -1,5 +1,11 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 @dataclass(frozen=True)
@@ -12,10 +18,18 @@ class Settings:
     embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "hash")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     qdrant_url: str = os.getenv("QDRANT_URL", "")
-    qdrant_collection: str = os.getenv("QDRANT_COLLECTION", "adaptive-rag")
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///adaptive_rag.db")
+    qdrant_collection: str = os.getenv(
+        "QDRANT_COLLECTION",
+        "adaptive-rag",
+    )
+    database_url: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite:///adaptive_rag.db",
+    )
     web_search_url: str = os.getenv("WEB_SEARCH_URL", "")
-    max_requests_per_minute: int = int(os.getenv("MAX_REQUESTS_PER_MINUTE", "60"))
+    max_requests_per_minute: int = int(
+        os.getenv("MAX_REQUESTS_PER_MINUTE", "60")
+    )
     host: str = os.getenv("HOST", "127.0.0.1")
     port: int = int(os.getenv("PORT", "8000"))
 

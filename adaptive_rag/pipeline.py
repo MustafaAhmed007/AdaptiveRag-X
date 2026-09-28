@@ -26,7 +26,12 @@ class AdaptivePipeline:
         self.retriever.add(documents)
         self.graph.add(documents)
 
-    def run(self, query: str, top_k: int = 5) -> QueryResponse:
+    def run(
+    self,
+    query: str,
+    top_k: int = 5,
+    tenant_id: str = "default",
+) -> QueryResponse:
         allowed, reason = self.security.inspect(query)
         if not allowed:
             raise ValueError(f"request blocked: {reason}")
@@ -39,9 +44,9 @@ class AdaptivePipeline:
             subqueries = decompose_query(query) if plan.profile.multi_hop else [query]
             pool: list[Evidence] = []
             for subquery in subqueries:
-                pool.extend(self.retriever.retrieve(subquery, plan.top_k))
+                pool.extend(self.retriever.retrieve(subquery, plan.top_k, tenant_id))
                 if plan.profile.multi_hop:
-                    pool.extend(self.graph.retrieve(subquery, plan.top_k))
+                    pool.extend(self.graph.retrieve(subquery, plan.top_k, tenant_id))
             if plan.profile.freshness_required:
                 pool.extend(self.web.retrieve(query, plan.top_k))
             evidence = list({item.document_id: item for item in pool}.values())

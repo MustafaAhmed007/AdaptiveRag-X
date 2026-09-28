@@ -11,13 +11,27 @@ dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "pydantic>=2.8",
+  "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "httpx>=0.27"]
-providers = ["openai>=1.40", "qdrant-client>=1.10"]
-reranking = ["sentence-transformers>=3.0"]
-all = ["openai>=1.40", "qdrant-client>=1.10", "sentence-transformers>=3.0"]
+dev = [
+  "pytest>=8",
+  "ruff>=0.6",
+  "httpx>=0.27",
+]
+providers = [
+  "openai>=1.40",
+  "qdrant-client>=1.10",
+]
+reranking = [
+  "sentence-transformers>=3.0",
+]
+all = [
+  "openai>=1.40",
+  "qdrant-client>=1.10",
+  "sentence-transformers>=3.0",
+]
 
 [project.scripts]
 adaptive-rag = "adaptive_rag.cli:main"
@@ -30,5 +44,6 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
 [tool.setuptools.packages.find]
 include = ["adaptive_rag*"]
