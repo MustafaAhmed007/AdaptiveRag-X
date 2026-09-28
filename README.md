@@ -2,11 +2,13 @@
 
 **AdaptiveRAG-X is an adaptive Retrieval-Augmented Generation (RAG) platform that dynamically chooses retrieval depth, search strategy, reranking and bounded reasoning based on the query.**
 
-Instead of forcing every question through the same `embed → retrieve → generate` path, AdaptiveRAG-X asks a more useful question first: **what does this query actually need?** Simple factual questions can take a fast path. Comparative and exploratory questions can use broader hybrid retrieval. Multi-hop questions can activate graph-assisted retrieval. Freshness-sensitive questions can use the web adapter. Weak evidence triggers a bounded rewrite-and-retry loop before generation.
+Instead of forcing every question through the same `embed → retrieve → generate` path, AdaptiveRAG-X first asks what the query actually needs. Simple factual questions can take a fast local path. Comparative and exploratory questions can use hybrid retrieval. Multi-hop questions can activate graph-assisted retrieval. Freshness-sensitive questions can use web retrieval. Weak evidence triggers a bounded rewrite-and-retry loop before generation.
 
-The project is designed to be **local-first, provider-agnostic, testable and production-oriented**. You can run the core without paid APIs, then connect real embeddings, Qdrant, web search, cross-encoder reranking and an LLM through explicit configuration and provider boundaries.
+The project is designed to be **local-first, provider-agnostic, testable and production-oriented**. The core can run without paid model APIs, while real embeddings, Qdrant, web search, cross-encoder reranking and LLM providers remain explicit configuration options.
 
 > Build once. Route intelligently. Measure continuously. Improve from evidence.
+
+---
 
 ## Why Adaptive RAG?
 
@@ -20,19 +22,19 @@ Traditional RAG is powerful, but a fixed pipeline creates predictable trade-offs
 - Current questions need fresh external evidence.
 - Low-quality retrieval should be detected before generation rather than hidden behind fluent prose.
 
-AdaptiveRAG-X turns those choices into an explicit orchestration layer. The planner profiles each query, selects a strategy, evaluates the evidence and retries only within a bounded budget.
+AdaptiveRAG-X turns these choices into an explicit orchestration layer. The planner profiles each query, selects a strategy, evaluates the evidence and retries only within a bounded budget.
 
 ## System Flow
 
 ```text
                          ┌──────────────────────┐
-                         │        USER QUERY    │
+                         │      USER QUERY      │
                          └──────────┬───────────┘
                                     │
                                     ▼
                          ┌──────────────────────┐
                          │    SECURITY GATE     │
-                         │ injection / policy   │
+                         │ injection / safety    │
                          └──────────┬───────────┘
                                     │
                                     ▼
@@ -65,8 +67,7 @@ AdaptiveRAG-X turns those choices into an explicit orchestration layer. The plan
                                     │          │
                                    no          ▼
                                     │   QUERY REWRITE
-                                    │          │
-                                    │    bounded retry
+                                    │   bounded retry
                                     │          │
                                     └──────────┘
                                     ▼
@@ -84,12 +85,12 @@ AdaptiveRAG-X turns those choices into an explicit orchestration layer. The plan
 
 | Query type | Strategy | Objective |
 |---|---|---|
-| Short factual | Fast dense/local | lowest practical latency |
-| Explanatory | Hybrid | semantic + lexical coverage |
-| Comparison | Hybrid + reranking | candidate breadth + precision |
-| Multi-hop | Hybrid + graph | relationship-aware evidence |
-| Current/fresh | Web + hybrid | fresh external evidence |
-| Weak retrieval | Rewrite + bounded retry | recover evidence quality |
+| Short factual | Fast dense/local | Lowest practical latency |
+| Explanatory | Hybrid | Semantic + lexical coverage |
+| Comparison | Hybrid + reranking | Candidate breadth + precision |
+| Multi-hop | Hybrid + graph | Relationship-aware evidence |
+| Current/fresh | Web + hybrid | Fresh external evidence |
+| Weak retrieval | Rewrite + bounded retry | Recover evidence quality |
 
 ## Architecture
 
@@ -110,19 +111,20 @@ adaptive_rag/
 ├── telemetry.py           logging/timing helpers
 ├── observability.py       traces + cost estimates
 ├── evaluation.py          retrieval + grounding metrics
+├── research.py            multi-aspect research workflow
 └── retrieval/
+    ├── base.py            retriever contract
     ├── memory.py          deterministic local retrieval
     ├── sparse.py          BM25 retrieval
     ├── hybrid.py          dense/sparse fusion
-    ├── graph.py           entity graph retrieval
-    ├── qdrant.py          Qdrant vector adapter
+    ├── graph.py           tenant-aware graph retrieval
+    ├── qdrant.py          tenant-aware Qdrant adapter
     ├── web.py             configurable web-search adapter
     └── rerank.py          deterministic reranking
 
-reranking.py               optional cross-encoder reranker
-benchmarks/                deterministic routing benchmark
-examples/                  runnable examples / seed knowledge
-scripts/                   developer and release helpers
+benchmarks/                deterministic routing benchmarks
+docs/                      project documentation
+tests/                     regression and integration tests
 .github/workflows/         CI quality gates
 ```
 
@@ -130,16 +132,15 @@ scripts/                   developer and release helpers
 
 | Layer | Included baseline | Production / configurable option | Role |
 |---|---|---|---|
-| Generation | `MockGenerator` | OpenAI Responses API | grounded response synthesis |
-| Primary LLM | local/no-key mode | GPT-4.1-mini or another compatible model | answer generation |
-| Embeddings | deterministic local embedder | OpenAI `text-embedding-3-small` or compatible provider | semantic vectors |
-| Sparse retrieval | BM25 | BM25/search-engine adapter | exact terms, IDs, keywords |
-| Dense retrieval | deterministic dense-like baseline | Qdrant + real embeddings | semantic recall |
-| Hybrid retrieval | weighted fusion | production fusion strategy | combined recall |
-| Reranking | score reranker | Sentence Transformers / cross-encoder | precision refinement |
-| Graph retrieval | lightweight entity graph | graph database adapter | multi-hop relationships |
-| Web retrieval | JSON endpoint adapter | search provider | current information |
-| Evaluation | deterministic metrics | external/LLM evaluator extension | quality gates |
+| Generation | `MockGenerator` | OpenAI Responses API | Grounded response synthesis |
+| Embeddings | `HashEmbedder` | OpenAI `text-embedding-3-small` or compatible provider | Semantic vectors |
+| Sparse retrieval | BM25 | BM25/search-engine adapter | Exact terms, IDs, keywords |
+| Dense retrieval | Deterministic local baseline | Qdrant + real embeddings | Semantic recall |
+| Hybrid retrieval | Weighted fusion | Production fusion strategy | Combined recall |
+| Reranking | Score reranker | Sentence Transformers / cross-encoder | Precision refinement |
+| Graph retrieval | Lightweight entity graph | Graph database adapter | Multi-hop relationships |
+| Web retrieval | JSON endpoint adapter | Search provider | Current information |
+| Evaluation | Deterministic metrics | External/LLM evaluator extension | Quality gates |
 
 **No model API key is committed to the repository.** Provider integrations are explicit so the same orchestration can move between local development and production infrastructure.
 
@@ -147,57 +148,161 @@ scripts/                   developer and release helpers
 
 | Category | Technology | Why it is here |
 |---|---|---|
-| Language | Python 3.11+ | mature AI/data ecosystem |
-| API | FastAPI + Uvicorn | typed, fast HTTP interface |
-| Validation | Pydantic v2 | reliable domain contracts |
-| Retrieval | Dense-like + BM25 + Hybrid + Graph + Web | adaptive evidence acquisition |
-| Vector database | Qdrant adapter | scalable semantic retrieval |
-| Durable storage | SQLite baseline | zero-dependency local persistence |
-| Reranking | deterministic + optional CrossEncoder | improve evidence precision |
-| Testing | Pytest | regression protection |
-| Linting | Ruff | fast static quality gate |
-| CI | GitHub Actions | automated verification |
-| Packaging | `pyproject.toml` | reproducible Python package |
-| Containers | Docker + Compose | portable deployment |
-| Configuration | environment variables | secret-safe deployment |
-| Observability | traces + timings + cost signals | operational feedback |
+| Language | Python 3.11+ | Mature AI/data ecosystem |
+| API | FastAPI + Uvicorn | Typed, fast HTTP interface |
+| Validation | Pydantic v2 | Reliable domain contracts |
+| Retrieval | Dense-like + BM25 + Hybrid + Graph + Web | Adaptive evidence acquisition |
+| Vector database | Qdrant adapter | Scalable semantic retrieval |
+| Durable storage | SQLite baseline | Zero-dependency local persistence |
+| Reranking | Deterministic + optional CrossEncoder | Improve evidence precision |
+| Testing | Pytest | Regression protection |
+| Linting | Ruff | Fast static quality gate |
+| CI | GitHub Actions | Automated verification |
+| Packaging | `pyproject.toml` | Reproducible Python package |
+| Containers | Docker + Compose | Portable deployment |
+| Configuration | Environment variables / `.env` | Secret-safe local configuration |
+| Observability | Traces + timings + cost signals | Operational feedback |
 
 ## Quick Start
 
+### 1. Create a virtual environment
+
 ```bash
 python -m venv .venv
+```
 
-# Linux/macOS
+### 2. Activate it
+
+**Linux/macOS**
+
+```bash
 source .venv/bin/activate
+```
 
-# Windows PowerShell
-# .venv\\Scripts\\Activate.ps1
+**Windows PowerShell**
 
-pip install -e ".[dev]"
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+**Windows CMD**
+
+```cmd
+.venv\Scripts\activate
+```
+
+### 3. Install the project
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+### 4. Configure local environment
+
+Copy `.env.example` to `.env` and set the values you need.
+
+At minimum, protected API endpoints require:
+
+```text
+ADAPTIVE_RAG_API_KEY=replace-with-a-local-secret
+```
+
+Keep the real `.env` out of source control. Only `.env.example` belongs in the repository.
+
+### 5. Run the API
+
+```bash
 uvicorn adaptive_rag.api:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` for interactive API documentation.
+The API exposes:
 
-### Add knowledge
+- `GET /health` — public health check.
+- `GET /ready` — authenticated readiness check.
+- `POST /v1/documents` — authenticated document ingestion.
+- `POST /v1/query` — authenticated adaptive RAG query.
+- `POST /v1/research` — authenticated multi-aspect research.
+
+Interactive API documentation is available at:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+## API Authentication
+
+Protected endpoints require the `x-api-key` HTTP header.
+
+Example:
+
+```bash
+curl http://127.0.0.1:8000/ready \
+  -H "x-api-key: YOUR_API_KEY"
+```
+
+Document ingestion:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/documents \
   -H "Content-Type: application/json" \
-  -d '{"text":"AdaptiveRAG-X selects retrieval strategies based on query characteristics."}'
+  -H "x-api-key: YOUR_API_KEY" \
+  -d '{"text":"AdaptiveRAG-X selects retrieval strategies based on query characteristics.","tenant_id":"default"}'
 ```
 
-### Query the system
+Query:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/query \
   -H "Content-Type: application/json" \
-  -d '{"query":"What does AdaptiveRAG-X do?","top_k":5}'
+  -H "x-api-key: YOUR_API_KEY" \
+  -d '{"query":"What does AdaptiveRAG-X do?","top_k":5,"tenant_id":"default"}'
 ```
 
-## Production Configuration
+The `/health` endpoint remains public so basic process health can be checked without credentials. Other API routes are protected by the authentication middleware.
 
-Copy `.env.example` to `.env` and configure only the infrastructure you actually use.
+## Tenant Isolation
+
+Documents and retrieval operations carry a `tenant_id`. Supported retrieval paths apply tenant filtering so evidence from one tenant is not returned to another tenant during retrieval.
+
+This includes:
+
+- in-memory retrieval
+- BM25 retrieval
+- hybrid retrieval
+- graph retrieval
+- Qdrant retrieval
+
+Qdrant documents also persist the tenant identifier in their payload, and Qdrant queries apply a tenant filter.
+
+### Important authorization boundary
+
+The current API accepts `tenant_id` from the request. Tenant filtering therefore provides **data partitioning**, but a single shared API key does not by itself establish identity-bound authorization between tenants.
+
+For a true multi-tenant deployment, bind the tenant identity to an authenticated principal, token, session or gateway-issued identity instead of trusting a caller-supplied tenant identifier.
+
+## Security
+
+AdaptiveRAG-X currently includes several security-oriented controls:
+
+- API-key authentication for protected endpoints.
+- Fail-closed behavior when API authentication is not configured.
+- In-memory request rate limiting.
+- Prompt-injection detection at the pipeline security gate.
+- Tenant-filtered retrieval across supported retrievers.
+- SSRF protection for remote research URLs, including blocking common local/private/link-local/reserved destinations and validating resolved addresses.
+- Environment-based configuration for credentials rather than hardcoded API keys.
+
+### Research URL safety
+
+Remote research URLs are validated before retrieval to reduce SSRF risk. The current protection checks the supplied URL and its resolved addresses.
+
+The application should still be deployed behind normal network controls and should not be treated as a substitute for an egress firewall or hardened HTTP client.
+
+### Local research files
+
+The research API also accepts local file paths. This is intended for trusted/local use. **Do not expose arbitrary local-file research access to untrusted callers without adding an explicit filesystem allowlist or sandbox.**
+
+## Production Configuration
 
 Important settings include:
 
@@ -212,13 +317,37 @@ Important settings include:
 - `ADAPTIVE_RAG_API_KEY`
 - `MAX_REQUESTS_PER_MINUTE`
 
-For production, use TLS, a managed database/vector store, restricted CORS, secret management, monitoring and an authenticated API gateway.
+For production, additionally use:
+
+- TLS/HTTPS.
+- A managed database and vector store where appropriate.
+- Restricted CORS origins instead of a permissive development configuration.
+- A proper secret manager.
+- Network egress controls.
+- Authenticated tenant identity rather than caller-supplied tenant IDs.
+- Monitoring and centralized logging.
+- A hardened filesystem policy for research inputs.
+- An authenticated API gateway where appropriate.
+
+Never commit API keys or other credentials to the repository. GitHub recommends keeping credentials out of source control and using environment variables, encrypted secrets or a secret manager instead. citeturn0search0turn0search1
 
 ## Quality & Evaluation
 
+Run the test suite:
+
+```bash
+pytest -q
+```
+
+Run linting:
+
 ```bash
 ruff check adaptive_rag tests benchmarks
-pytest -q
+```
+
+Run benchmarks:
+
+```bash
 python -m benchmarks.run
 ```
 
@@ -233,108 +362,40 @@ The evaluation layer separates several signals rather than pretending that one s
 
 This creates a feedback loop for adaptive routing and bounded recovery.
 
-## Growth & Virality Strategy
+### Current verified baseline
 
-AdaptiveRAG-X is structured not only as a codebase, but as a **discoverable open-source project**. The goal is to make every useful concept easy to understand, demonstrate, search for and share.
-
-### 1. Search-driven technical content
-
-The repository naturally maps to high-intent topics such as:
-
-- adaptive RAG
-- agentic RAG
-- hybrid RAG
-- RAG evaluation
-- BM25 vs dense retrieval
-- reranking for RAG
-- multi-hop RAG
-- GraphRAG architecture
-- production RAG pipelines
-- cost-aware LLM systems
-- grounded generation
-- retrieval routing
-
-Architecture and evaluation documentation can become standalone technical articles, examples and benchmark discussions without changing the core engine.
-
-### 2. Shareable demonstrations
-
-The most viral asset is not a claim that the system is "better". It is a reproducible demonstration.
-
-Recommended public demo loop:
+The current development checkout has a passing automated test suite:
 
 ```text
-Question
-   ↓
-Router decision
-   ↓
-Selected retrieval strategy
-   ↓
-Evidence returned
-   ↓
-Reranking
-   ↓
-Quality score
-   ↓
-Final answer + citations
+15 passed
 ```
 
-This makes the invisible RAG decision process visible and gives developers something concrete to compare, fork and discuss.
+The exact count can change as additional regression and security tests are added.
 
-### 3. Benchmark-led growth
-
-Every meaningful retrieval improvement should be measurable. The project includes deterministic benchmark infrastructure so future experiments can publish:
-
-- routing accuracy
-- retrieval quality
-- latency
-- retry rate
-- citation coverage
-- estimated cost
-
-That creates a compounding engineering loop: **experiment → measure → document → share → attract contributors → improve → repeat**.
-
-### 4. SEO-friendly documentation architecture
-
-Documentation should target questions developers actually search for rather than keyword stuffing. The project structure supports dedicated guides for adaptive routing, hybrid retrieval, reranking, GraphRAG, evaluation, deployment and provider integration.
-
-Each guide should link back to runnable examples and benchmarks, creating a strong internal knowledge graph instead of isolated pages.
-
-### 5. Open-source contribution flywheel
+## Repository Structure
 
 ```text
-Useful repository
-      ↓
-Clear README + architecture
-      ↓
-Runnable examples
-      ↓
-Benchmarks + transparent results
-      ↓
-Issues / discussions / contributions
-      ↓
-New integrations and experiments
-      ↓
-More documentation + demos
-      ↓
-More discovery and adoption
-      └───────────────↺
+AdaptiveRag-X/
+├── .github/              CI workflows
+├── adaptive_rag/         application package
+├── benchmarks/           benchmark suite
+├── docs/                 documentation
+├── tests/                automated tests
+├── .env.example          configuration template
+├── Dockerfile            container image
+├── docker-compose.yml     local container orchestration
+├── install.ps1            Windows installer
+├── install.sh             Unix installer
+├── Makefile               development commands
+├── pyproject.toml         package/dependency configuration
+├── README.md              project documentation
+├── SECURITY.md            security policy
+├── CONTRIBUTING.md        contribution guide
+├── CHANGELOG.md           change history
+└── LICENSE                MIT license
 ```
 
-This is the intended growth engine. **Virality cannot be guaranteed**, so the system is optimized for shareability, reproducibility, search intent, technical credibility and low-friction contribution instead of artificial growth claims.
-
-## Recommended Content Surface
-
-For a serious public launch, the strongest companion pages are:
-
-1. **Adaptive RAG explained** — why routing beats one fixed pipeline.
-2. **Hybrid RAG guide** — BM25 + dense retrieval + reranking.
-3. **RAG evaluation guide** — how to measure groundedness and citation coverage.
-4. **Adaptive RAG benchmark** — reproducible routing/quality/latency results.
-5. **Production deployment guide** — Qdrant, LLM provider and observability setup.
-6. **Architecture deep dive** — planner, retrievers, evaluator and recovery loop.
-7. **Examples cookbook** — practical RAG patterns developers can copy.
-
-These topics form a connected technical content cluster rather than disconnected SEO pages.
+Local/generated directories such as `.venv/`, `.pytest_cache/`, `.ruff_cache/` and `*.egg-info/` are development artifacts and are not part of the source distribution.
 
 ## Design Principles
 
@@ -343,17 +404,23 @@ These topics form a connected technical content cluster rather than disconnected
 3. **Bounded retries, never uncontrolled agent loops.**
 4. **Provider-agnostic boundaries.**
 5. **Local-first development with production adapters.**
-6. **Tenant-aware domain contracts.**
+6. **Tenant-aware domain contracts and retrieval filters.**
 7. **Security belongs inside the pipeline.**
 8. **Measure quality, latency and cost together.**
 9. **Make integrations explicit rather than faking capabilities.**
 10. **Prefer reproducible benchmarks over marketing claims.**
 
-## Repository Status
+## Project Status
 
-AdaptiveRAG-X contains a runnable adaptive-RAG core plus production-oriented boundaries for embeddings, Qdrant, web retrieval, graph retrieval, reranking, durable storage, authentication, rate limiting and observability. External services remain opt-in because they require credentials or infrastructure outside source control.
+AdaptiveRAG-X contains a runnable adaptive-RAG core plus production-oriented boundaries for embeddings, Qdrant, web retrieval, graph retrieval, reranking, durable storage, authentication, rate limiting, evaluation and observability.
 
-The repository is intentionally honest about what runs locally versus what requires external infrastructure.
+The repository is intentionally explicit about the difference between:
+
+- **local deterministic functionality** that works without external credentials,
+- **optional provider integrations** that require external services,
+- and **production hardening** that must be supplied by the deployment environment.
+
+The project should be treated as an actively developed engineering system rather than a claim of universal RAG correctness or complete production security.
 
 ## License
 
